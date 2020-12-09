@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
 #include <allegro5/allegro5.h>
 #include <allegro5/allegro_font.h>
 #include <allegro5/allegro_image.h>
@@ -11,37 +13,51 @@ ALLEGRO_BITMAP *bmp;
 ALLEGRO_BITMAP *roca;
 ALLEGRO_BITMAP *punto;
 ALLEGRO_BITMAP *pacman;
+ALLEGRO_BITMAP *blinky;
+ALLEGRO_BITMAP *inky;
+ALLEGRO_BITMAP *pinky;
+ALLEGRO_BITMAP *clyde;
 ALLEGRO_KEYBOARD_STATE keyState;
+
+struct info{
+  int xf,yf;
+  int moveSpeedf;
+  int dirf;
+};
 
 enum Direction {UP,DOWN,LEFT,RIGHT};
 
 bool done = false, draw=true,active=false;
-int x = 30, y = 30;    
-int moveSpeed = 15;
+int x = 30, y = 30;  
+int moveSpeed = 30;
 int dir = DOWN; 
 int state = 0;
 int sourceX=0,sourceY=0;
+struct info B = {420,180,30,RIGHT};
+struct info I = {390,270,30,UP};
+struct info P = {420,270,30,DOWN};
+struct info C = {460,270,20,LEFT};
 
 char mapa[MAXFILAS][MAXCOLS]={ 
   "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
-  "~ccccccccccc~~~~~ccccccccccc~",
+  "~|cccccccccc~~~~~cccccccccc|~",
   "~c~~~c~~~~~c~~~~~c~~~~~c~~~c~",
   "~c~~~c~~~~~c~~~~~c~~~~~c~~~c~",
-  "~ccccccccccccccccccccccccccc~",
+  "~cccccccccccccccc|cccccccccc~",
   "~c~~~c~~c~~~~~~~~~~~c~~c~~~c~",
-  "~ccccc~~ccccccccccccc~~ccccc~",
+  "~ccccc~~|cccccccccccc~~|cccc~",
   "~c~~~c~~c~~~~   ~~~~c~~c~~~c~",
-  "~c~~~c~~c~~~     ~~~c~~c~~~c~",
-  "cccccc~~c~~~     ~~~c~~cccccc",
+  "~c~~~c~~c~~~~   ~~~~c~~c~~~c~",
+  "c|cccc~~c~~~~   ~~~~c~~cccccc",
   "~c~~~c~~c~~~~~~~~~~~c~~c~~~c~",
-  "~c~~~c~~ccccccccccccc~~c~~~c~",
+  "~c~~~c~~|ccccccccccc|~~c~~~c~",
   "~c~~~c~~~~~~c~~~c~~~~~~c~~~c~",
-  "~ccccc~~ccccc~~~ccccc~~ccccc~",
+  "~cccc|~~ccccc~~~ccccc~~|cccc~",
   "~c~~~c~~c~~~~~~~~~~~c~~c~~~c~",
-  "~o~~~ccccccccccccccccccc~~~c~",
+  "~c~~~ccccc|ccccccccccccc~~~c~",
   "~c~~~c~~~~c~~~~~~~~c~~~c~~~c~",
   "~c~~~c~~~~cccccccccc~~~c~~~c~",
-  "~cccccccccc~~~~~~~~ccccccccc~",
+  "~|ccccccccc~~~~~~~~cccccccc|~",
   "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 };
 
@@ -50,7 +66,7 @@ void dibujar_mapa(ALLEGRO_BITMAP *r,ALLEGRO_BITMAP *p){
       for(int j = 0; j< MAXCOLS; j++)
         if(mapa[i][j] == '~'){
             al_draw_bitmap_region(r,0,0,30,30,j*30,i*30,0);                         
-        }else if(mapa[i][j] == 'c'){
+        }else if(mapa[i][j] == 'c' ||  mapa[i][j] == '|'){
             al_draw_bitmap_region(p,0,0,30,30,j*30,i*30,0);
             if(( (y/30) == i ) && ( (x/30) ==j))
                 mapa[i][j] = ' ';
@@ -60,6 +76,96 @@ void dibujar_mapa(ALLEGRO_BITMAP *r,ALLEGRO_BITMAP *p){
 void dibujar_pacman(ALLEGRO_BITMAP *pm){
     al_draw_bitmap_region(pm,sourceX,sourceY,28,28,x,y,0);
 }
+
+void dibujar_fantasma(ALLEGRO_BITMAP *pm, int xf,int yf){
+    al_draw_bitmap(pm,xf,yf,0);
+}
+
+void mover_fantasma(int xi,int yj,int direccion,int fantasma){
+     if (fantasma == 0){       
+        B.dirf = direccion;
+        B.xf = xi;
+        B.yf = yj;
+
+     }
+ 
+     if (fantasma == 1){       
+        I.dirf = direccion;
+        I.xf = xi;
+        I.yf = yj;
+     }
+     
+     if (fantasma == 2){      
+        P.dirf = direccion;
+        P.xf = xi;
+        P.yf = yj;
+     }
+     
+     if (fantasma == 3){      
+        C.dirf = direccion;
+        C.xf = xi;
+        C.yf = yj;
+     }
+}
+
+void mover_random(int xi,int yj, int direccion, int fantasma,int speed){
+    srand(time(NULL));
+
+    if(mapa[(yj-30)/30][xi/30] == '|' && fantasma == 2){
+      direccion = rand()%4;
+      mover_fantasma(xi,yj,direccion,fantasma);
+      printf("INKY");
+      printf("%d\n",direccion);
+    }
+
+    if(mapa[(yj-30)/30][xi/30] == '|' && fantasma == 3){
+      direccion = rand()%4;
+      mover_fantasma(xi,yj,direccion,fantasma);
+      printf("PINKY");
+      printf("%d\n",direccion);
+    }
+        
+    if(direccion == 0){ //up
+      if(mapa[(yj-30)/30][xi/30] != '~'){
+        yj-=speed;
+        mover_fantasma(xi,yj,direccion,fantasma);
+      }else{
+        direccion = rand()%4;
+        mover_fantasma(xi,yj,direccion,fantasma);
+      }
+    }
+
+    if(direccion == 1){ //down
+      if(mapa[(yj+30)/30][xi/30] != '~'){
+        yj+=speed;
+        mover_fantasma(xi,yj,direccion,fantasma);
+      }else{
+        direccion = rand()%4;
+        mover_fantasma(xi,yj,direccion,fantasma);
+      }
+    } 
+    if(direccion == 2){ //left
+      if(mapa[yj/30][(xi-30)/30] != '~'){
+        xi-=speed;
+        mover_fantasma(xi,yj,direccion,fantasma);
+      }else{ 
+        direccion = rand()%4;
+        mover_fantasma(xi,yj,direccion,fantasma);
+      }
+    } 
+    if(direccion == 3){ //right
+      if(mapa[yj/30][(xi+30)/30] != '~'){
+        xi+=speed;
+        mover_fantasma(xi,yj,direccion,fantasma);
+      }else{ 
+        direccion = rand()%4;
+        mover_fantasma(xi,yj,direccion,fantasma);
+      } 
+    } 
+}
+
+
+
 
 void teclas(){
     al_get_keyboard_state(&keyState);
@@ -113,14 +219,14 @@ void teclas(){
 }
 
 void allegro_funciones(){
-   
+    
     al_init();
     al_install_keyboard();
     al_init_primitives_addon();
     al_init_image_addon();
 
     
-    ALLEGRO_TIMER* timer = al_create_timer(1.0 / 30.0);
+    ALLEGRO_TIMER* timer = al_create_timer(1.0 / 60.0);
     ALLEGRO_EVENT_QUEUE* queue = al_create_event_queue();
     ALLEGRO_DISPLAY* disp = al_create_display(880,600);
     al_set_window_title(disp,"Pac-Man"); //nombre de la ventana
@@ -130,6 +236,10 @@ void allegro_funciones(){
     roca = al_load_bitmap("roca.jpg");
     punto = al_load_bitmap("punto.png");
     pacman = al_load_bitmap("pacman.png");
+    blinky = al_load_bitmap("Blinky.png");
+    inky = al_load_bitmap("Inky.png");
+    pinky = al_load_bitmap("Pinky.png");
+    clyde = al_load_bitmap("Clyde.png");
     al_register_event_source(queue, al_get_keyboard_event_source());
     al_register_event_source(queue, al_get_display_event_source(disp));
     al_register_event_source(queue, al_get_timer_event_source(timer));
@@ -165,6 +275,14 @@ void allegro_funciones(){
         al_draw_bitmap(bmp , 0 , 0 , 0);
         dibujar_mapa(roca,punto);
         dibujar_pacman(pacman);
+        dibujar_fantasma(blinky,B.xf,B.yf);
+        dibujar_fantasma(inky,I.xf,I.yf);
+        dibujar_fantasma(pinky,P.xf,P.yf);
+        dibujar_fantasma(clyde,C.xf,C.yf);
+        mover_random(B.xf,B.yf,B.dirf,0,B.moveSpeedf);
+        mover_random(I.xf,I.yf,I.dirf,1,I.moveSpeedf);
+        mover_random(P.xf,P.yf,P.dirf,2,P.moveSpeedf);
+        mover_random(C.xf,C.yf,C.dirf,3,C.moveSpeedf);
         al_flip_display();
         al_clear_to_color(al_map_rgb(0, 0, 0));  
        }
@@ -172,6 +290,10 @@ void allegro_funciones(){
     al_destroy_bitmap(roca);
     al_destroy_bitmap(pacman);
     al_destroy_bitmap(punto);
+    al_destroy_bitmap(blinky);
+    al_destroy_bitmap(inky);
+    al_destroy_bitmap(pinky);
+    al_destroy_bitmap(clyde);
     al_destroy_display(disp);
     al_destroy_timer(timer);
     al_destroy_event_queue(queue);
