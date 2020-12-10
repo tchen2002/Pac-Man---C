@@ -10,9 +10,6 @@
 #define MAXFILAS 20
 #define MAXCOLS  31
 
-pthread_t hilos[1];
-pthread_mutex_t sem;
-
 ALLEGRO_BITMAP *bmp;
 ALLEGRO_BITMAP *roca;
 ALLEGRO_BITMAP *punto;
@@ -23,9 +20,13 @@ ALLEGRO_BITMAP *pinky;
 ALLEGRO_BITMAP *clyde;
 ALLEGRO_KEYBOARD_STATE keyState;
 
+pthread_t hilos[5];
+pthread_mutex_t sem;
+
 struct info{
-  int xf,yf;
-  int moveSpeedf;
+  int xf;
+  int yf;
+  int ff;
   int dirf;
 };
 
@@ -37,19 +38,19 @@ int moveSpeed = 30;
 int dir = DOWN; 
 int state = 0;
 int sourceX=0,sourceY=0;
-struct info B = {420,180,30,RIGHT};
-struct info I = {390,270,30,UP};
-struct info P = {420,270,30,LEFT};
-struct info C = {460,270,20,LEFT};
+struct info B = {420,180,0,RIGHT};
+struct info I = {390,270,1,UP};
+struct info P = {420,270,2,DOWN};
+struct info C = {450,270,3,LEFT};
 
 char mapa[MAXFILAS][MAXCOLS]={ 
   "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
   "~|cccccccccc~~~~~cccccccccc|~",
   "~c~~~c~~~~~c~~~~~c~~~~~c~~~c~",
   "~c~~~c~~~~~c~~~~~c~~~~~c~~~c~",
-  "~|ccccccccccccccccccccccccc|~",
+  "~cccccccccccccccc|cccccccccc~",
   "~c~~~c~~c~~~~~~~~~~~c~~c~~~c~",
-  "~ccccc~~|ccccccccccc|~~|cccc~",
+  "~ccccc~~|cccccccccccc~~|cccc~",
   "~c~~~c~~c~~~~   ~~~~c~~c~~~c~",
   "~c~~~c~~c~~~~   ~~~~c~~c~~~c~",
   "c|cccc~~c~~~~   ~~~~c~~cccccc",
@@ -78,7 +79,7 @@ void dibujar_mapa(ALLEGRO_BITMAP *r,ALLEGRO_BITMAP *p){
 }
 
 void dibujar_pacman(){
-    al_draw_bitmap_region(pacman,sourceX,sourceY,28,28,x,y,0);
+    al_draw_bitmap_region(pacman,sourceX,sourceY,30,30,x,y,0);
 }
 
 void dibujar_fantasma(ALLEGRO_BITMAP *pm, int xf,int yf){
@@ -111,92 +112,117 @@ void mover_fantasma(int xi,int yj,int direccion,int fantasma){
      }
 }
 
-void mover_random(int xi,int yj, int direccion, int fantasma,int speed){
-    
+/*void * mover_binky(void *entrada){
+   pthread_mutex_lock(&sem);
 
-    if(mapa[(yj-30)/30][xi/30] == '|' && fantasma == 2){
-      srand(time(NULL));
-      mover_fantasma(xi,yj,rand()%2,fantasma);
-    }
+   pthread_mutex_unlock(&sem); 
+}*/
 
-    if(mapa[(yj-30)/30][xi/30] == '|'){
-      srand(time(NULL));
-      mover_fantasma(xi,yj,rand()%4,fantasma);
-    }
-        
+void * mover_random(void *entrada){
+    pthread_mutex_lock(&sem);
+    int xi = ((struct info*)entrada)->xf;
+    int yj = ((struct info*)entrada)->yf;
+    int fantasma = ((struct info*)entrada)->ff;
+    int direccion =((struct info*)entrada)->dirf;
+
     if(direccion == 0){ //up
       if(mapa[(yj-30)/30][xi/30] != '~'){
-        mover_fantasma(xi,(yj-=speed),direccion,fantasma);
+        yj-=moveSpeed;
+        mover_fantasma(xi,yj,direccion,fantasma);
       }else{
-        srand(time(NULL));
-        mover_fantasma(xi,yj,rand()%4,fantasma);
+         srand(time(NULL));
+        direccion = rand()%4;
+        mover_fantasma(xi,yj,direccion,fantasma);
       }
     }
 
     if(direccion == 1){ //down
       if(mapa[(yj+30)/30][xi/30] != '~'){
-        mover_fantasma(xi,(yj+=speed),direccion,fantasma);
+        yj+=moveSpeed;
+        mover_fantasma(xi,yj,direccion,fantasma);
       }else{
         srand(time(NULL));
-        mover_fantasma(xi,yj,rand()%4,fantasma);
+        direccion = rand()%4;
+        mover_fantasma(xi,yj,direccion,fantasma);
       }
-    }
-
+    } 
     if(direccion == 2){ //left
       if(mapa[yj/30][(xi-30)/30] != '~'){
-        mover_fantasma((xi-=speed),yj,direccion,fantasma);
+        xi-=moveSpeed;
+        mover_fantasma(xi,yj,direccion,fantasma);
       }else{ 
         srand(time(NULL));
-        mover_fantasma(xi,yj,rand()%4,fantasma);
+        direccion = rand()%4;
+        mover_fantasma(xi,yj,direccion,fantasma);
       }
     } 
-
     if(direccion == 3){ //right
       if(mapa[yj/30][(xi+30)/30] != '~'){
-        mover_fantasma((xi+=speed),yj,direccion,fantasma);
+        xi+=moveSpeed;
+        mover_fantasma(xi,yj,direccion,fantasma);
       }else{ 
         srand(time(NULL));
-        mover_fantasma(xi,yj,rand()%4,fantasma);
+        direccion = rand()%4;
+        mover_fantasma(xi,yj,direccion,fantasma);
       } 
-    } 
+    }
+    pthread_mutex_unlock(&sem); 
 }
 
-void * mover_inky(void * param){
+
+void * mover_inky(void *entrada){
     pthread_mutex_lock(&sem);
-    srand(time(NULL));
-     
+
     if(mapa[(I.yf-30)/30][I.xf/30] == '|'){
+      srand(time(NULL));
       I.dirf = rand()%4;
     }
-        
+
     if(I.dirf == 0){ //up
-      if(mapa[(I.yf-30)/30][I.xf/30] != '~')
-        I.yf-=I.moveSpeedf;
-      else I.dirf = rand()%4;
+      if(mapa[(I.yf-30)/30][I.xf/30] != '~'){
+        I.yf-= moveSpeed;
+      }else{
+        srand(time(NULL));
+        I.dirf = rand()%4;
+      }
     }
 
     if(I.dirf == 1){ //down
-      if(mapa[(I.yf+30)/30][I.xf/30] != '~')
-        I.yf+=I.moveSpeedf;
-      else I.dirf = rand()%4;
-    } 
-    if(I.dirf == 2){ //left
-      if(mapa[I.yf/30][(I.xf-30)/30] != '~')
-        I.xf-=I.moveSpeedf;
-      else I.dirf = rand()%4;
-    } 
-    if(I.dirf == 3){ //right
-      if(mapa[I.yf/30][(I.xf+30)/30] != '~')
-        I.xf+=I.moveSpeedf;
-      else I.dirf = rand()%4;
+      if(mapa[(I.yf+30)/30][I.xf/30] != '~'){
+        I.yf+=moveSpeed;
+      }else{
+        srand(time(NULL));
+        I.dirf = rand()%4;
+      }
     } 
 
-    dibujar_fantasma(inky,I.xf,I.yf);
-    pthread_mutex_unlock(&sem);
+    if(I.dirf == 2){ //left
+      if(mapa[I.yf/30][(I.xf-30)/30] != '~'){
+        I.xf-=moveSpeed;
+      }else{ 
+        srand(time(NULL));
+        I.dirf = rand()%4;
+      }
+    } 
+
+    if(I.dirf == 3){ //right
+      if(mapa[I.yf/30][(I.xf+30)/30] != '~'){
+        I.xf +=moveSpeed;
+      }else{ 
+        srand(time(NULL));
+        I.dirf = rand()%4;
+      } 
+    }
+
+    if(I.xf <= -30)
+      I.xf=870;
+    else if(I.xf >= 870)
+      I.xf=-30;
+
+    pthread_mutex_unlock(&sem); 
 }
 
-void  teclas(){
-
+void * teclas(void * param){
     al_get_keyboard_state(&keyState);
     active = true;
     if(al_key_down(&keyState,ALLEGRO_KEY_DOWN)){
@@ -232,11 +258,12 @@ void  teclas(){
       else dir = 4;
     }      
     
-    //Rutine para atajo
+    //Rutina para atajo
     if(x <= -30)
       x=870;
     else if(x >= 870)
       x=-30;
+
 
     if(active==true)
         sourceX += al_get_bitmap_width(pacman)/4;
@@ -245,18 +272,19 @@ void  teclas(){
     if(sourceX>=al_get_bitmap_width(pacman))    
       sourceX=0;
     draw=true;
-  
 }
 
 void allegro_funciones(){
-    pthread_mutex_init(&sem, 0);
+    
     al_init();
     al_install_keyboard();
     al_init_primitives_addon();
     al_init_image_addon();
-
-    
+    pthread_mutex_init(&sem, 0);
+    pthread_mutex_init(&sem, 0);
     ALLEGRO_TIMER* timer = al_create_timer(1.0 / 60.0);
+    ALLEGRO_TIMER* timerClyde = al_create_timer(1.0 / 48.0);
+    ALLEGRO_TIMER* timerPacman = al_create_timer(1.0 / 200.0);
     ALLEGRO_EVENT_QUEUE* queue = al_create_event_queue();
     ALLEGRO_DISPLAY* disp = al_create_display(880,600);
     al_set_window_title(disp,"Pac-Man"); //nombre de la ventana
@@ -273,11 +301,15 @@ void allegro_funciones(){
     al_register_event_source(queue, al_get_keyboard_event_source());
     al_register_event_source(queue, al_get_display_event_source(disp));
     al_register_event_source(queue, al_get_timer_event_source(timer));
+    al_register_event_source(queue, al_get_timer_event_source(timerPacman));
+    al_register_event_source(queue, al_get_timer_event_source(timerClyde));
 
     ALLEGRO_EVENT event;
     al_hide_mouse_cursor(disp);
     al_start_timer(timer);
-
+    al_start_timer(timerClyde);
+    al_start_timer(timerPacman);
+    
     al_set_target_bitmap(bmp);
     al_clear_to_color(al_map_rgb(0,0,0));
     al_set_target_bitmap(al_get_backbuffer(disp));
@@ -298,23 +330,35 @@ void allegro_funciones(){
       }
 
       if(event.type == ALLEGRO_EVENT_TIMER){
-        teclas();
-      }
-
-      if(draw){
         al_draw_bitmap(bmp , 0 , 0 , 0);
         dibujar_mapa(roca,punto);
         dibujar_pacman();
         dibujar_fantasma(blinky,B.xf,B.yf);
-        pthread_create(hilos, NULL,mover_inky, NULL);
+        dibujar_fantasma(inky,I.xf,I.yf);
         dibujar_fantasma(pinky,P.xf,P.yf);
         dibujar_fantasma(clyde,C.xf,C.yf);
-        mover_random(B.xf,B.yf,B.dirf,0,B.moveSpeedf);
-        mover_random(I.xf,I.yf,I.dirf,1,I.moveSpeedf);
-        mover_random(P.xf,P.yf,P.dirf,2,P.moveSpeedf);
-        mover_random(C.xf,C.yf,C.dirf,3,C.moveSpeedf);
+        if(event.timer.source == timerPacman){
+          pthread_create(&hilos[0], NULL,teclas, NULL);
+        }else{
+            if(event.timer.source == timer){
+
+              pthread_create(&(hilos[1]),NULL,mover_random,&B);
+              pthread_create(&(hilos[2]),NULL,mover_inky,&I);
+              pthread_create(&(hilos[3]),NULL,mover_random,&P);
+            }else if(event.timer.source == timerClyde){
+              
+              pthread_create(&(hilos[4]),NULL,mover_random,&C);
+            }
+        }
+      
+
+
+        for(int i = 0; i<5; i++)
+          pthread_join(hilos[i],NULL);
+
         al_flip_display();
         al_clear_to_color(al_map_rgb(0, 0, 0));  
+        
        }
     }        
     al_destroy_bitmap(roca);
@@ -333,5 +377,3 @@ int main(){
     allegro_funciones();
     return 0;
 }
-
-
