@@ -5,9 +5,13 @@
 #include <allegro5/allegro_font.h>
 #include <allegro5/allegro_image.h>
 #include <allegro5/allegro_primitives.h>
+#include <pthread.h>
 
 #define MAXFILAS 20
 #define MAXCOLS  31
+
+pthread_t hilos[1];
+pthread_mutex_t sem;
 
 ALLEGRO_BITMAP *bmp;
 ALLEGRO_BITMAP *roca;
@@ -35,7 +39,7 @@ int state = 0;
 int sourceX=0,sourceY=0;
 struct info B = {420,180,30,RIGHT};
 struct info I = {390,270,30,UP};
-struct info P = {420,270,30,DOWN};
+struct info P = {420,270,30,LEFT};
 struct info C = {460,270,20,LEFT};
 
 char mapa[MAXFILAS][MAXCOLS]={ 
@@ -43,9 +47,9 @@ char mapa[MAXFILAS][MAXCOLS]={
   "~|cccccccccc~~~~~cccccccccc|~",
   "~c~~~c~~~~~c~~~~~c~~~~~c~~~c~",
   "~c~~~c~~~~~c~~~~~c~~~~~c~~~c~",
-  "~cccccccccccccccc|cccccccccc~",
+  "~|ccccccccccccccccccccccccc|~",
   "~c~~~c~~c~~~~~~~~~~~c~~c~~~c~",
-  "~ccccc~~|cccccccccccc~~|cccc~",
+  "~ccccc~~|ccccccccccc|~~|cccc~",
   "~c~~~c~~c~~~~   ~~~~c~~c~~~c~",
   "~c~~~c~~c~~~~   ~~~~c~~c~~~c~",
   "c|cccc~~c~~~~   ~~~~c~~cccccc",
@@ -73,8 +77,8 @@ void dibujar_mapa(ALLEGRO_BITMAP *r,ALLEGRO_BITMAP *p){
         }
 }
 
-void dibujar_pacman(ALLEGRO_BITMAP *pm){
-    al_draw_bitmap_region(pm,sourceX,sourceY,28,28,x,y,0);
+void dibujar_pacman(){
+    al_draw_bitmap_region(pacman,sourceX,sourceY,28,28,x,y,0);
 }
 
 void dibujar_fantasma(ALLEGRO_BITMAP *pm, int xf,int yf){
@@ -86,7 +90,6 @@ void mover_fantasma(int xi,int yj,int direccion,int fantasma){
         B.dirf = direccion;
         B.xf = xi;
         B.yf = yj;
-
      }
  
      if (fantasma == 1){       
@@ -109,65 +112,91 @@ void mover_fantasma(int xi,int yj,int direccion,int fantasma){
 }
 
 void mover_random(int xi,int yj, int direccion, int fantasma,int speed){
-    srand(time(NULL));
+    
 
     if(mapa[(yj-30)/30][xi/30] == '|' && fantasma == 2){
-      direccion = rand()%4;
-      mover_fantasma(xi,yj,direccion,fantasma);
-      printf("INKY");
-      printf("%d\n",direccion);
+      srand(time(NULL));
+      mover_fantasma(xi,yj,rand()%2,fantasma);
     }
 
-    if(mapa[(yj-30)/30][xi/30] == '|' && fantasma == 3){
-      direccion = rand()%4;
-      mover_fantasma(xi,yj,direccion,fantasma);
-      printf("PINKY");
-      printf("%d\n",direccion);
+    if(mapa[(yj-30)/30][xi/30] == '|'){
+      srand(time(NULL));
+      mover_fantasma(xi,yj,rand()%4,fantasma);
     }
         
     if(direccion == 0){ //up
       if(mapa[(yj-30)/30][xi/30] != '~'){
-        yj-=speed;
-        mover_fantasma(xi,yj,direccion,fantasma);
+        mover_fantasma(xi,(yj-=speed),direccion,fantasma);
       }else{
-        direccion = rand()%4;
-        mover_fantasma(xi,yj,direccion,fantasma);
+        srand(time(NULL));
+        mover_fantasma(xi,yj,rand()%4,fantasma);
       }
     }
 
     if(direccion == 1){ //down
       if(mapa[(yj+30)/30][xi/30] != '~'){
-        yj+=speed;
-        mover_fantasma(xi,yj,direccion,fantasma);
+        mover_fantasma(xi,(yj+=speed),direccion,fantasma);
       }else{
-        direccion = rand()%4;
-        mover_fantasma(xi,yj,direccion,fantasma);
+        srand(time(NULL));
+        mover_fantasma(xi,yj,rand()%4,fantasma);
       }
-    } 
+    }
+
     if(direccion == 2){ //left
       if(mapa[yj/30][(xi-30)/30] != '~'){
-        xi-=speed;
-        mover_fantasma(xi,yj,direccion,fantasma);
+        mover_fantasma((xi-=speed),yj,direccion,fantasma);
       }else{ 
-        direccion = rand()%4;
-        mover_fantasma(xi,yj,direccion,fantasma);
+        srand(time(NULL));
+        mover_fantasma(xi,yj,rand()%4,fantasma);
       }
     } 
+
     if(direccion == 3){ //right
       if(mapa[yj/30][(xi+30)/30] != '~'){
-        xi+=speed;
-        mover_fantasma(xi,yj,direccion,fantasma);
+        mover_fantasma((xi+=speed),yj,direccion,fantasma);
       }else{ 
-        direccion = rand()%4;
-        mover_fantasma(xi,yj,direccion,fantasma);
+        srand(time(NULL));
+        mover_fantasma(xi,yj,rand()%4,fantasma);
       } 
     } 
 }
 
+void * mover_inky(void * param){
+    pthread_mutex_lock(&sem);
+    srand(time(NULL));
+     
+    if(mapa[(I.yf-30)/30][I.xf/30] == '|'){
+      I.dirf = rand()%4;
+    }
+        
+    if(I.dirf == 0){ //up
+      if(mapa[(I.yf-30)/30][I.xf/30] != '~')
+        I.yf-=I.moveSpeedf;
+      else I.dirf = rand()%4;
+    }
 
+    if(I.dirf == 1){ //down
+      if(mapa[(I.yf+30)/30][I.xf/30] != '~')
+        I.yf+=I.moveSpeedf;
+      else I.dirf = rand()%4;
+    } 
+    if(I.dirf == 2){ //left
+      if(mapa[I.yf/30][(I.xf-30)/30] != '~')
+        I.xf-=I.moveSpeedf;
+      else I.dirf = rand()%4;
+    } 
+    if(I.dirf == 3){ //right
+      if(mapa[I.yf/30][(I.xf+30)/30] != '~')
+        I.xf+=I.moveSpeedf;
+      else I.dirf = rand()%4;
+    } 
 
+    dibujar_fantasma(inky,I.xf,I.yf);
+    pthread_mutex_unlock(&sem);
+}
 
-void teclas(){
+void  teclas(){
+
     al_get_keyboard_state(&keyState);
     active = true;
     if(al_key_down(&keyState,ALLEGRO_KEY_DOWN)){
@@ -216,10 +245,11 @@ void teclas(){
     if(sourceX>=al_get_bitmap_width(pacman))    
       sourceX=0;
     draw=true;
+  
 }
 
 void allegro_funciones(){
-    
+    pthread_mutex_init(&sem, 0);
     al_init();
     al_install_keyboard();
     al_init_primitives_addon();
@@ -274,9 +304,9 @@ void allegro_funciones(){
       if(draw){
         al_draw_bitmap(bmp , 0 , 0 , 0);
         dibujar_mapa(roca,punto);
-        dibujar_pacman(pacman);
+        dibujar_pacman();
         dibujar_fantasma(blinky,B.xf,B.yf);
-        dibujar_fantasma(inky,I.xf,I.yf);
+        pthread_create(hilos, NULL,mover_inky, NULL);
         dibujar_fantasma(pinky,P.xf,P.yf);
         dibujar_fantasma(clyde,C.xf,C.yf);
         mover_random(B.xf,B.yf,B.dirf,0,B.moveSpeedf);
@@ -303,3 +333,5 @@ int main(){
     allegro_funciones();
     return 0;
 }
+
+
