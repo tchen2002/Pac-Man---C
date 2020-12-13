@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <stdbool.h>
+#include <string.h>
 #include <allegro5/allegro5.h>
 #include <allegro5/allegro_font.h>
 #include <allegro5/allegro_image.h>
@@ -13,7 +15,11 @@
 ALLEGRO_BITMAP *bmp;
 ALLEGRO_BITMAP *roca;
 ALLEGRO_BITMAP *punto;
-ALLEGRO_BITMAP *pacman;
+ALLEGRO_BITMAP *pacmanArriba;
+ALLEGRO_BITMAP *pacmanAbajo;
+ALLEGRO_BITMAP *pacmanIzq;
+ALLEGRO_BITMAP *pacmanDer;
+ALLEGRO_BITMAP *semilla;
 ALLEGRO_BITMAP *blinky;
 ALLEGRO_BITMAP *inky;
 ALLEGRO_BITMAP *pinky;
@@ -32,16 +38,17 @@ struct info{
 
 enum Direction {UP,DOWN,LEFT,RIGHT};
 
-bool done = false, draw=true,active=false;
+bool done = false, draw=true;
+bool estadoFantasma = true;
 int x = 30, y = 30;  
 int moveSpeed = 30;
 int dir = DOWN; 
 int state = 0;
-int sourceX=0,sourceY=0;
 struct info B = {420,180,0,RIGHT};
 struct info I = {390,270,1,UP};
 struct info P = {420,270,2,DOWN};
 struct info C = {450,270,3,LEFT};
+int NumCoordenadas[32] = {1,2,17,27,10,8,4,15,6,26,13,3,17,5,1,22,13,19,3,5,6,12,9,26,15,15,17,18,8,1,18,2};
 
 char mapa[MAXFILAS][MAXCOLS]={ 
   "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
@@ -66,7 +73,56 @@ char mapa[MAXFILAS][MAXCOLS]={
   "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 };
 
-void dibujar_mapa(ALLEGRO_BITMAP *r,ALLEGRO_BITMAP *p){
+
+void colocarSemillas(int Cant,char str[]){
+  int i=0;
+  int xx;
+  int yy;
+  if(strcmp(str,"normal")==0){
+    while(i<Cant*2){
+      xx= NumCoordenadas[i];
+      yy=NumCoordenadas[++i];
+      ++i;
+      mapa[xx][yy] = 's';
+    }    
+  }else if(strcmp(str,"aleatorio")==0){
+      srand(time(NULL));
+      while(i<Cant){
+        xx=rand()%19;
+        yy=rand()%30;
+        while(mapa[xx][yy] != 'c'){
+          xx=rand()%19;
+          yy=rand()%30;
+        }
+        mapa[xx][yy] = 's';
+        ++i;
+      }
+   }
+}
+
+void delay(unsigned milliseconds){
+    clock_t pause;
+    clock_t start;
+
+    pause = milliseconds * (CLOCKS_PER_SEC / 1000);
+    start = clock();
+    while((clock()-start)<pause);
+}
+
+/*
+void comerSemillas(bool estadoFantasma){
+    int i=0; 
+    if(estadoFantasma == false){
+         while(i < 5) { 
+          delay(1000);
+          ++i; 
+      }   
+    }
+
+}
+*/
+
+void dibujar_mapa(ALLEGRO_BITMAP *r,ALLEGRO_BITMAP *p,ALLEGRO_BITMAP *s){
     for(int i = 0; i< MAXFILAS; i++)
       for(int j = 0; j< MAXCOLS; j++)
         if(mapa[i][j] == '~'){
@@ -75,15 +131,36 @@ void dibujar_mapa(ALLEGRO_BITMAP *r,ALLEGRO_BITMAP *p){
             al_draw_bitmap_region(p,0,0,30,30,j*30,i*30,0);
             if(( (y/30) == i ) && ( (x/30) ==j))
                 mapa[i][j] = ' ';
+        }else if(mapa[i][j] == 's'){
+            al_draw_bitmap_region(s,0,0,30,30,j*30,i*30,0);
+            if(((y/30) == i) && ((x/30) ==j))
+                //estadoFantasma = false;
+                mapa[i][j] = ' ';
         }
 }
 
+
 void dibujar_pacman(){
-    al_draw_bitmap_region(pacman,sourceX,sourceY,30,30,x,y,0);
+    if(dir == 0){
+        al_draw_bitmap(pacmanArriba,x,y,0);      
+    }else if(dir == 1){
+        al_draw_bitmap(pacmanAbajo,x,y,0);
+    }else if(dir == 2){
+        al_draw_bitmap(pacmanIzq,x,y,0);
+    }else if(dir == 3){
+        al_draw_bitmap(pacmanDer,x,y,0);
+    }else{
+        al_draw_bitmap(pacmanDer,x,y,0);
+    }
 }
 
 void dibujar_fantasma(ALLEGRO_BITMAP *pm, int xf,int yf){
-    al_draw_bitmap(pm,xf,yf,0);
+    //al_draw_bitmap(pm,xf,yf,0);
+  if(estadoFantasma == false){
+      al_draw_tinted_bitmap(pm, al_map_rgba_f(1, 0, 1, 1), xf, yf, 0);
+    }else{
+       al_draw_tinted_bitmap(pm, al_map_rgba_f(1, 1, 1, 1), xf, yf, 0);       
+    }
 }
 
 void mover_fantasma(int xi,int yj,int direccion,int fantasma){
@@ -130,7 +207,7 @@ void * mover_random(void *entrada){
         yj-=moveSpeed;
         mover_fantasma(xi,yj,direccion,fantasma);
       }else{
-         srand(time(NULL));
+        srand(time(NULL));
         direccion = rand()%4;
         mover_fantasma(xi,yj,direccion,fantasma);
       }
@@ -224,7 +301,6 @@ void * mover_inky(void *entrada){
 
 void * teclas(void * param){
     al_get_keyboard_state(&keyState);
-    active = true;
     if(al_key_down(&keyState,ALLEGRO_KEY_DOWN)){
       dir = DOWN;
     }else if(al_key_down(&keyState,ALLEGRO_KEY_UP)){
@@ -233,9 +309,7 @@ void * teclas(void * param){
       dir = RIGHT;
     }else if(al_key_down(&keyState,ALLEGRO_KEY_LEFT)){
       dir=LEFT;         
-    }else{
-      active=false;
-    }  
+    }
 
     if(dir == 0){ //up
       if(mapa[(y-30)/30][x/30] != '~')
@@ -263,48 +337,41 @@ void * teclas(void * param){
       x=870;
     else if(x >= 870)
       x=-30;
-
-
-    if(active==true)
-        sourceX += al_get_bitmap_width(pacman)/4;
-    else sourceX =30;
-    
-    if(sourceX>=al_get_bitmap_width(pacman))    
-      sourceX=0;
-    draw=true;
 }
 
 void allegro_funciones(){
-    
+
     al_init();
     al_install_keyboard();
     al_init_primitives_addon();
     al_init_image_addon();
     pthread_mutex_init(&sem, 0);
     pthread_mutex_init(&sem, 0);
-    ALLEGRO_TIMER* timer = al_create_timer(1.0 / 60.0);
-    ALLEGRO_TIMER* timerClyde = al_create_timer(1.0 / 48.0);
-    ALLEGRO_TIMER* timerPacman = al_create_timer(1.0 / 200.0);
-    ALLEGRO_EVENT_QUEUE* queue = al_create_event_queue();
+    ALLEGRO_TIMER* timer = al_create_timer(1.0 / 60);
+    ALLEGRO_TIMER* timerClyde = al_create_timer(1.0 / 48);
+    ALLEGRO_TIMER* timerPacman = al_create_timer(1.0 / 200);
     ALLEGRO_DISPLAY* disp = al_create_display(880,600);
     al_set_window_title(disp,"Pac-Man"); //nombre de la ventana
     al_set_new_bitmap_flags(ALLEGRO_MEMORY_BITMAP);
-
     ALLEGRO_BITMAP* bmp = al_create_bitmap(880,600);
     roca = al_load_bitmap("roca.jpg");
     punto = al_load_bitmap("punto.png");
-    pacman = al_load_bitmap("pacman.png");
+    semilla = al_load_bitmap("Semilla.png");
+    pacmanArriba = al_load_bitmap("pacmanArriba.png");
+    pacmanAbajo = al_load_bitmap("pacmanAbajo.png");
+    pacmanIzq = al_load_bitmap("pacmanIzq.png");
+    pacmanDer = al_load_bitmap("pacmanDer.png");
     blinky = al_load_bitmap("Blinky.png");
     inky = al_load_bitmap("Inky.png");
     pinky = al_load_bitmap("Pinky.png");
     clyde = al_load_bitmap("Clyde.png");
+    ALLEGRO_EVENT_QUEUE* queue = al_create_event_queue();
     al_register_event_source(queue, al_get_keyboard_event_source());
     al_register_event_source(queue, al_get_display_event_source(disp));
     al_register_event_source(queue, al_get_timer_event_source(timer));
     al_register_event_source(queue, al_get_timer_event_source(timerPacman));
     al_register_event_source(queue, al_get_timer_event_source(timerClyde));
 
-    ALLEGRO_EVENT event;
     al_hide_mouse_cursor(disp);
     al_start_timer(timer);
     al_start_timer(timerClyde);
@@ -317,12 +384,13 @@ void allegro_funciones(){
 
     while(!done){
       ALLEGRO_EVENT event;
+
       al_wait_for_event(queue,&event);
       if(event.type == ALLEGRO_EVENT_KEY_UP){
+        puts("hola");
         switch(event.keyboard.keycode){
           case ALLEGRO_KEY_ESCAPE:
-            done=true;
-            break;
+            done = true;
         }
       }else if(event.type == ALLEGRO_EVENT_DISPLAY_CLOSE){
           done = true;
@@ -331,7 +399,7 @@ void allegro_funciones(){
 
       if(event.type == ALLEGRO_EVENT_TIMER){
         al_draw_bitmap(bmp , 0 , 0 , 0);
-        dibujar_mapa(roca,punto);
+        dibujar_mapa(roca,punto,semilla);
         dibujar_pacman();
         dibujar_fantasma(blinky,B.xf,B.yf);
         dibujar_fantasma(inky,I.xf,I.yf);
@@ -350,9 +418,6 @@ void allegro_funciones(){
               pthread_create(&(hilos[4]),NULL,mover_random,&C);
             }
         }
-      
-
-
         for(int i = 0; i<5; i++)
           pthread_join(hilos[i],NULL);
 
@@ -362,18 +427,35 @@ void allegro_funciones(){
        }
     }        
     al_destroy_bitmap(roca);
-    al_destroy_bitmap(pacman);
+    al_destroy_bitmap(pacmanArriba);
+    al_destroy_bitmap(pacmanAbajo);
+    al_destroy_bitmap(pacmanIzq);
+    al_destroy_bitmap(pacmanDer);        
     al_destroy_bitmap(punto);
+    al_destroy_bitmap(semilla);
     al_destroy_bitmap(blinky);
     al_destroy_bitmap(inky);
     al_destroy_bitmap(pinky);
     al_destroy_bitmap(clyde);
     al_destroy_display(disp);
     al_destroy_timer(timer);
+    al_destroy_timer(timerPacman);
+    al_destroy_timer(timerClyde);
     al_destroy_event_queue(queue);
 }
 
 int main(){
+    FILE* ptr = fopen("ArchivoConfig.txt","r");     
+    int VelocidadFant;
+    int ValocidadPacman;
+    char TipoSemilla[12];
+    int CantiSemilla;
+    fscanf(ptr,"%d",&VelocidadFant); 
+    fscanf(ptr,"%d",&ValocidadPacman);
+    fscanf(ptr,"%s",TipoSemilla); 
+    fscanf(ptr,"%d",&CantiSemilla);
+    colocarSemillas(CantiSemilla,TipoSemilla);
     allegro_funciones();
+
     return 0;
 }
