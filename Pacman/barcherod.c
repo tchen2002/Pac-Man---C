@@ -6,7 +6,7 @@ Profesor: Eddy Ramírez
 Proyecto3 - Estructurado
 Estudiantes: Te Chen Huang 
              María José Barquero Pérez
-			 Kendall Rodríguez Mora
+			       Kendall Rodríguez Mora
 */
 
 #include <stdio.h>
@@ -44,22 +44,22 @@ pthread_mutex_t semc = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t semf = PTHREAD_MUTEX_INITIALIZER; 
 pthread_mutex_t semp = PTHREAD_MUTEX_INITIALIZER; 
 
-//En esta estructura se almacenará los datos de los fantasma
+//En esta estructura se almacenará los datos de los fantasmas
 struct info_fant{
   int xf;  //Posición x de fantasma
   int yf;  //Posición y de fantasma
   int id;  //Id de fantasma (0-3)
-  int dirf; //Direcćión de fantasma
+  int dirf; //Dirección de fantasma
 };
 
 //up=0,down=1,left=1,right=2;
 enum Direction {up,down,left,right};
 
-//En esta estructura se almacenará los datos de los fantasma
+//En esta estructura se almacenará los datos de los fantasmas
 struct info_fant B = {420,180,0,right};  //Blinky
-struct info_fant I = {390,270,1,up};  //Inky
-struct info_fant P = {420,270,2,down}; //Pinky
-struct info_fant C = {450,270,3,left}; //Clyde
+struct info_fant I = {390,270,1,up};     //Inky
+struct info_fant P = {420,270,2,down};   //Pinky
+struct info_fant C = {450,270,3,left};   //Clyde
 
 //En esta estructura se almacenará los datos de aquellos nodos que están conectados con al menos un nodo
 struct NodoFW{
@@ -67,7 +67,7 @@ struct NodoFW{
     int numNodo; //Número nodo (0-239) en total hay 240 nodos que están conectados con al menos uno
     int posx; //Posición x
     int posy; //Posición y 
-    int Arr_Pos[maxi]; //Un arreglo que contienen con cuáles nodo está relacionado
+    int Arr_Pos[maxi]; //Un arreglo que contienen con cuáles nodos está relacionado
 };
 
 char mapa[maxfil][maxcol]; //Matriz del tablero
@@ -75,11 +75,11 @@ int matriz_recorrido[nodos][nodos]; //Matriz de recorrido
 int dist[nodos][nodos]; //Matriz de distancia
 int Camino[100]; //Arreglo que se va a almacenar la ruta más corta entre Pacman y Pinky
 int inteligencia[100]; //Arreglo que se va a almacenar la ruta de blinky y Clyde
-struct NodoFW arr_nodofw[maxarreglo]; //Arreglo donde se va a almacednar los 240 nodos (que está conectado con al menos uno)
+struct NodoFW arr_nodofw[maxarreglo]; //Arreglo donde se va a almacenar los 240 nodos (que está conectado con al menos uno)
 
 int CantiSemilla;
 char TipoSemilla[12];
-int x=420,y=510,ax,ay;
+int x=420,y=510,ax,ay;                         //Posiciones donde empieza pacman
 float speed,speedClyde,speedFants,speedPacman; //Velocidades
 int CantMovimiento=0,moveSpeed=30,vidas=5,dir = down;
 bool done=false,escapan=false,estadoTablero=true,estadoFantasma=false;
@@ -91,6 +91,7 @@ pthread_mutex_t semf;
 pthread_mutex_t semp;
 
 //Mapa original
+// c = cocos, ~ = pared, | = cocos, s = semillas 
 char mapa_original[maxfil][maxcol]={ 
   "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
   "~|cccccccccc~~~~~cccccccccc|~",
@@ -144,8 +145,8 @@ void llenarTablero(){
 //Función: llenarArreglo
 //Dominio: No recibe ningún parámetro
 //Codominio: En esta función se verifica cuáles son los nodos que están conectados con
-//			al menos un nodo, y se almacenará sus datos.  Por otro lado, se pone -1
-// 			en la matriz de recorrido cuando no se sabe cuál es la distancia entre los nodos
+//		       al menos un nodo, y se almacenará sus datos.  Por otro lado, se pone -1
+// 			     en la matriz de recorrido cuando no se sabe cuál es la distancia entre los nodos
 void llenarArreglo(){
   int i=0,nodo,a,n;
   while(i < maxarreglo){
@@ -217,8 +218,8 @@ int retornarpos(int min,int max,int buscado) {
 //Dominio: No recibe ningún parámetro
 //Codominio: En esta función, inicializa la matriz de adyacencia
 //           Se pone 0 cuando la distancia es del propio nodo
-//           En este caso, se pone 1 a aquellos nodos que están conectados
-//           Se pone inf, y no están relacionados
+//           En este caso, se pone 1 en aquellos nodos que están conectados
+//           Se pone inf, si no están relacionados
 void inicializar_matriz_distancia(){
   int p,pos;
   for(int i=0;i<maxarreglo;i++){
@@ -239,7 +240,7 @@ void inicializar_matriz_distancia(){
 
 //Función: floyd_warshall
 //Dominio: No recibe ningún parámetro
-//Codominio: En eset caso el conjunto de vértices esta numerados de 0 a 239 
+//Codominio: En este caso el conjunto de vértices esta numerados de 0 a 239 
 // y existe dos opciones para recorrerlo, el primero sería solo utilizar los 
 // vértices del conjunto 1 a k, y luego se verifica desde i hasta k+1, y 
 // finalmente de j hasta k, y se verifica si la distancia actual dist[i][j] 
@@ -365,10 +366,10 @@ void dibujar_pacman(){
 }
 
 //Función: dibujar_fantasma
-//Dominio: Recibe un BITMAP que representa cuál es el fantsma, y las posiciones de los fantasmas
-//Codominio: En esta función, dibujan los fantasma según las posiciones
+//Dominio: Recibe un BITMAP que representa cuál es el fantasma, y las posiciones de los fantasmas
+//Codominio: En esta función, dibujan los fantasmas según las posiciones
 //           Sí el estado de los fantasmas es true, entonces se cambian al color azul para indicarle al
-//           usuario que ya puede comer a los fantasmas 
+//           usuario que ya puede comerselos
 void dibujar_fantasma(ALLEGRO_BITMAP *pm, int xf,int yf){
   if(estadoFantasma == true){
       al_draw_tinted_bitmap(pm, al_map_rgba_f(1, 0, 1, 1), xf, yf, 0);
@@ -377,6 +378,12 @@ void dibujar_fantasma(ALLEGRO_BITMAP *pm, int xf,int yf){
     }
 }
 
+//Función: volver_casita
+//Domonio: Recibe la posición del fantasma y su identificación
+//Codominio: En esta función según el id del fantasma va a calcular el inicio y destino del camino que debe recorrer
+//           donde según cada fantasma se devuelven a la posición inicial, donde por ejemplo 78 es 6,14 para blinky, 
+//           por medio del while se va a recorrer todo el camino hasta su destino, y se aumenta su velocidad en un 120%
+//           esto lo realizamos multiplicando la velocidad original por 1.2. 
 void volver_casita(int xi,int yj,int fantasma){
     int inicio = retornarpos((yj/30) * maxcol + (xi/30));
     int destino;
@@ -453,6 +460,13 @@ void volver_casita(int xi,int yj,int fantasma){
     }
 }
 
+//Función: mover_inky
+//Dominio: No recibe ningún parámetro 
+//Codominio: Esta función permite que Inky se mueva aleatoriamente, para evitar que el fantasma se quede pegado
+//           se pone en varios lugares del mapa un "|" esto permite que cambie su posición también
+//           según la dirrección en la que se encuentre el fantasma va a realizar la validación de si puede subir, 
+//           bajar, derecha o izquierda, con el rand()%4 lo que hacemos es elegir un número aleatorio entra 0 y 3
+//           y así Inky se va a mover aleatoriamente
 void mover_inky(){
     if(mapa[(I.yf-30)/30][I.xf/30] == '|'){
       srand(time(NULL));
@@ -527,7 +541,7 @@ void choque_camino(){
 //Función: inteligencia_fantasma
 //Dominio: Recibe tres números enteros, el nodo inicio y nodo final, y el id de fantasma
 //Codominio: En esta función, predice los movimientos de Pinky, e intenta bloquear la otra salida 
-//           Primero se verifica si el pacman está en una posición verticla o horizontal, y después verifica
+//           Primero se verifica si el pacman está en una posición vertical o horizontal, y después verifica
 //           a cuál dirección se va mover para poder sacar la posición contraria
 void inteligencia_fantasma(int inicio,int destino,int fantasma){
     int py=y,px=x;
@@ -621,6 +635,14 @@ void inteligencia_fantasma(int inicio,int destino,int fantasma){
     }
 }
 
+//Función: Mover_fantasmas
+//Dominio: No recibe ningún parámetro
+//Codominio: Es la función principal donde se encarga de que cada fantasma tenga sus características por aparte
+//           cuando escapan es igual a true significa que deben escapar de pacman, por lo que se cambia el destino por volve a la casita
+//           si no deben escapar, entonces segpun cada fantasma llama a la función correspondiente, clyde es el número 3, tiene una velocidad de un 80%
+//           y tiene la misma inteligencia que blinky, blinky es el número 0 va a la misma velocidad que inky y pinky,
+//           pinky es el número 1, y este siempre va a buscar a pacman por la ruta más corta, y por último inky es el número 2
+//           llama a la función de mover_inky, con mutex permite que los fantasmas tengan la velocidad que deseamos 
 void * mover_fantasmas(void *entrada){
      
     int xi = ((struct info_fant*)entrada)->xf;
@@ -749,7 +771,10 @@ void perdio(){
 
 //Función: allegro_funciones
 //Dominio: No recibe ningún parámetro
-//Codominio: 
+//Codominio: Se encarga de iniciar todas las funciones relacionadas a la biblioteca allegro
+//           Se crean los hilos, se cargan las imágenes que van a representar a los personajes
+//           Se crea un while donde permite que el juego se vaya ejecutando, y cuando este termine
+//           poder salirse del juego si perdemos 
 void allegro_funciones(){
     float tiempo = 60.0;
     //Incializar 
@@ -866,6 +891,12 @@ void allegro_funciones(){
     al_destroy_event_queue(queue);
 }
 
+//Main
+//Dominio: No recibe parámetros
+//Codominio: Lee los datos del archivo txt donde vienen las variables para saber 
+//           la velocidad de fantasmas y pacman, cantidad de semillas, y si estas se van a distrubir 
+//           normal o aleatoriamente, antes de iniciar el juego se crean todos los caminos de las rutas 
+//           más cortas y luego empieza el juego 
 int main(){
     FILE* ptr = fopen("ArchivoConfig.txt","r");     
     float VelocidadFant;
