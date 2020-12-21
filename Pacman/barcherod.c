@@ -1,3 +1,14 @@
+/*
+Instituto Tecnológico de Costa Rica
+IC4700 - Lenguajes de Programación
+II Semestre 2020
+Profesor: Eddy Ramírez
+Proyecto3 - Estructurado
+Estudiantes: Te Chen Huang 
+             María José Barquero Pérez
+			 Kendall Rodríguez Mora
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h> 
@@ -7,23 +18,13 @@
 #include <allegro5/allegro_image.h>
 #include <allegro5/allegro_primitives.h>
 
-#define maxfil 20
+#define maxfil 20 
 #define maxcol  29
 #define inf 999999
 #define num 98989
 #define nodos 240
 #define maxarreglo 240
 #define maxi 4
-
-bool estadoTablero=true;
-
-float speed;
-float speedClyde;
-float speedPacman;
-float speedFants;
-
-char TipoSemilla[12];
-int CantiSemilla;
 
 ALLEGRO_BITMAP *bmp;
 ALLEGRO_BITMAP *roca;
@@ -39,53 +40,57 @@ ALLEGRO_BITMAP *pinky;
 ALLEGRO_BITMAP *clyde;
 ALLEGRO_KEYBOARD_STATE keyState;
 
-bool estadoFantasma = false;
 pthread_mutex_t semc = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t semf = PTHREAD_MUTEX_INITIALIZER; 
 pthread_mutex_t semp = PTHREAD_MUTEX_INITIALIZER; 
-bool escapan = false;
 
-struct info{
-  int xf;
-  int yf;
-  int id;
-  int dirf;
+//En esta estructura se almacenará los datos de los fantasma
+struct info_fant{
+  int xf;  //Posición x de fantasma
+  int yf;  //Posición y de fantasma
+  int id;  //Id de fantasma (0-3)
+  int dirf; //Direcćión de fantasma
 };
 
+//up=0,down=1,left=1,right=2;
+enum Direction {up,down,left,right};
+
+//En esta estructura se almacenará los datos de los fantasma
+struct info_fant B = {420,180,0,right};  //Blinky
+struct info_fant I = {390,270,1,up};  //Inky
+struct info_fant P = {420,270,2,down}; //Pinky
+struct info_fant C = {450,270,3,left}; //Clyde
+
+//En esta estructura se almacenará los datos de aquellos nodos que están conectados con al menos un nodo
 struct NodoFW{
-    int indice;
-    int numNodo;
-    int posx;
-    int posy;
-    int Arr_Pos[maxi];
+    int indice; //Índice de nodo (0-579)
+    int numNodo; //Número nodo (0-239) en total hay 240 nodos que están conectados con al menos uno
+    int posx; //Posición x
+    int posy; //Posición y 
+    int Arr_Pos[maxi]; //Un arreglo que contienen con cuáles nodo está relacionado
 };
 
-struct NodoFW arr_nodofw[maxarreglo];
-int matriz_recorrido[nodos][nodos];
-int dist[nodos][nodos];
-int Camino[100];
-int inteligencia[100];
+char mapa[maxfil][maxcol]; //Matriz del tablero
+int matriz_recorrido[nodos][nodos]; //Matriz de recorrido
+int dist[nodos][nodos]; //Matriz de distancia
+int Camino[100]; //Arreglo que se va a almacenar la ruta más corta entre Pacman y Pinky
+int inteligencia[100]; //Arreglo que se va a almacenar la ruta de blinky y Clyde
+struct NodoFW arr_nodofw[maxarreglo]; //Arreglo donde se va a almacednar los 240 nodos (que está conectado con al menos uno)
 
-enum Direction {UP,DOWN,LEFT,RIGHT};
-
-int CantMovimiento=0;
-bool done = false, draw=true;
-int x = 420, y = 510;  
-int moveSpeed = 30;
-int dir = DOWN; 
-int state = 0;
-struct info B = {420,180,0,RIGHT};
-struct info I = {390,270,1,UP};
-struct info P = {420,270,2,DOWN};
-struct info C = {450,270,3,LEFT};
-int vidas = 20;
+int CantiSemilla;
+char TipoSemilla[12];
+int x=420,y=510,ax,ay;
+float speed,speedClyde,speedFants,speedPacman; //Velocidades
+int CantMovimiento=0,moveSpeed=30,vidas=5,dir = down;
+bool done=false,escapan=false,estadoTablero=true,estadoFantasma=false;
+//Posiciones donde se van colocar las semillas
 int NumCoordenadas[32] = {1,2,17,27,10,8,4,15,6,26,13,3,17,5,1,22,13,19,3,5,6,12,9,26,15,15,17,18,8,1,18,2};
-char mapa[maxfil][maxcol];
-int ax,ay;
+
 pthread_mutex_t semc;
 pthread_mutex_t semf;
 pthread_mutex_t semp;
 
+//Mapa original
 char mapa_original[maxfil][maxcol]={ 
   "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
   "~|cccccccccc~~~~~cccccccccc|~",
@@ -109,6 +114,10 @@ char mapa_original[maxfil][maxcol]={
   "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 };
 
+//Función: Verificar tablero
+//Dominio: No recibe ningún parámetro
+//Codominio: Retorna 1 si el Pacman ya se comió todas las semillas y en el caso contrario 0
+//En esta función se verifica si aún queda semilla en el tablero 
 int verificar_tablero(){
   for(int i=0;i<maxfil;i++){
     for(int j=0;j<maxcol;j++){
@@ -121,6 +130,9 @@ int verificar_tablero(){
   return 1;
 }
 
+//Función: llenarTablero
+//Dominio: No recibe ningún parámetro
+//Codominio: En esta función se llena la matriz de mapa usando la matriz original
 void llenarTablero(){
   for(int i=0;i<maxfil;i++){
     for(int j=0;j<maxcol;j++){
@@ -129,6 +141,11 @@ void llenarTablero(){
   }
 }
 
+//Función: llenarArreglo
+//Dominio: No recibe ningún parámetro
+//Codominio: En esta función se verifica cuáles son los nodos que están conectados con
+//			al menos un nodo, y se almacenará sus datos.  Por otro lado, se pone -1
+// 			en la matriz de recorrido cuando no se sabe cuál es la distancia entre los nodos
 void llenarArreglo(){
   int i=0,nodo,a,n;
   while(i < maxarreglo){
@@ -165,6 +182,9 @@ void llenarArreglo(){
   } 
 }
 
+//Función: retornarpos
+//Dominio: Recibe un número entero, que es el índice del nodo (0-579)
+//Codominio: Retorna un número entero, que buscará cuál es el número que lo representa (0-239) 
 int retornarpos(int n){
   int i=0,p;
   while(i<maxarreglo){
@@ -177,6 +197,7 @@ int retornarpos(int n){
 }
 
 /*
+:) Es mejor XD
 int retornarpos(int min,int max,int buscado) {
   int pivote = (max + min) / 2;
   if(arr_nodofw[pivote].numNodo == buscado){ 
@@ -192,6 +213,12 @@ int retornarpos(int min,int max,int buscado) {
 }
 */
 
+//Función: inicializar_matriz_distancia
+//Dominio: No recibe ningún parámetro
+//Codominio: En esta función, inicializa la matriz de adyacencia
+//           Se pone 0 cuando la distancia es del propio nodo
+//           En este caso, se pone 1 a aquellos nodos que están conectados
+//           Se pone inf, y no están relacionados
 void inicializar_matriz_distancia(){
   int p,pos;
   for(int i=0;i<maxarreglo;i++){
@@ -210,6 +237,13 @@ void inicializar_matriz_distancia(){
   }
 }
 
+//Función: floyd_warshall
+//Dominio: No recibe ningún parámetro
+//Codominio: En eset caso el conjunto de vértices esta numerados de 0 a 239 
+// y existe dos opciones para recorrerlo, el primero sería solo utilizar los 
+// vértices del conjunto 1 a k, y luego se verifica desde i hasta k+1, y 
+// finalmente de j hasta k, y se verifica si la distancia actual dist[i][j] 
+// es mayor que la distancia dist[i][k] + dist[k][j], si es verdad se actualiza en  DIST[i][j]
 void floyd_warshall(){  
   for(int k = 0; k < maxarreglo; k++) {  
     for(int i = 0; i < maxarreglo; i++) {  
@@ -227,6 +261,9 @@ void floyd_warshall(){
   }  
 }
 
+//Función: encontrar_ruta
+//Dominio: Recibe dos números enteros ini y fin
+//Codominio: Busca el camino más corto entre ini y fin y lo almacena en el arreglo camino
 void encontrar_ruta(int ini,int fin){ 
   if(matriz_recorrido[ini][fin] == -1){
     Camino[0]=0;
@@ -240,6 +277,9 @@ void encontrar_ruta(int ini,int fin){
   }
 }
 
+//Función: encontrar_ruta_inteligencia
+//Dominio: Recibe dos números enteros ini y fin
+//Codominio:Busca el camino más corto entre ini y fin y lo almacena en el arreglo camino
 void encontrar_ruta_inteligencia(int ini,int fin){ 
   if(matriz_recorrido[ini][fin] == -1){
     inteligencia[0]=0;
@@ -253,6 +293,10 @@ void encontrar_ruta_inteligencia(int ini,int fin){
   }
 }
 
+//Función: colocarSemillas
+//Dominio: Recibe un número entero y la manera de como se va a distribuir las semillas (normal y aleatorio)
+//Codominio: En el caso de normal, se utilizará el arreglo de posiciones para colocarlas, y en el otro se van ir generando
+//           números aletorios e ir verificando si se puede colocarla o no 
 void colocarSemillas(int Cant,char str[]){
   int i=0;
   int xx;
@@ -279,13 +323,18 @@ void colocarSemillas(int Cant,char str[]){
    }
 }
 
-void dibujar_mapa(ALLEGRO_BITMAP *r,ALLEGRO_BITMAP *p,ALLEGRO_BITMAP *s){
+//Función: dibujar_mapa
+//Dominio: Recibe 3 BITMAP (roca,coco,semilla)
+//Codominio: '~' representa pared, 'c' y '|' representan coco y 's' es semilla
+//           Cada vez que el Pacman se come una semilla, el tablero se va a ir
+//           actualizando y se reemplaza por un espacio 
+void dibujar_mapa(ALLEGRO_BITMAP *r,ALLEGRO_BITMAP *c,ALLEGRO_BITMAP *s){
     for(int i = 0; i< maxfil; i++)
       for(int j = 0; j< maxcol; j++)
         if(mapa[i][j] == '~'){
             al_draw_bitmap_region(r,0,0,30,30,j*30,i*30,0);                         
         }else if(mapa[i][j] == 'c' ||  mapa[i][j] == '|'){
-            al_draw_bitmap_region(p,0,0,30,30,j*30,i*30,0);
+            al_draw_bitmap_region(c,0,0,30,30,j*30,i*30,0);
             if(( (y/30) == i ) && ( (x/30) ==j))
                 mapa[i][j] = ' ';
         }else if(mapa[i][j] == 's'){
@@ -298,21 +347,28 @@ void dibujar_mapa(ALLEGRO_BITMAP *r,ALLEGRO_BITMAP *p,ALLEGRO_BITMAP *s){
     }
 }
 
-
+//Función: dibujar_pacman
+//Dominio: No recibe ningún parámetro 
+//Codominio: En esta función, se dibuja el Pacman según la dirección 
 void dibujar_pacman(){
-    if(dir == 0){
+    if(dir == 0){ //arriba
         al_draw_bitmap(pacmanArriba,x,y,0);      
-    }else if(dir == 1){
+    }else if(dir == 1){ //abajo
         al_draw_bitmap(pacmanAbajo,x,y,0);
-    }else if(dir == 2){
+    }else if(dir == 2){ //Izq
         al_draw_bitmap(pacmanIzq,x,y,0);
-    }else if(dir == 3){
+    }else if(dir == 3){ //Der
         al_draw_bitmap(pacmanDer,x,y,0);
     }else{
         al_draw_bitmap(pacmanDer,x,y,0);
     }
 }
 
+//Función: dibujar_fantasma
+//Dominio: Recibe un BITMAP que representa cuál es el fantsma, y las posiciones de los fantasmas
+//Codominio: En esta función, dibujan los fantasma según las posiciones
+//           Sí el estado de los fantasmas es true, entonces se cambian al color azul para indicarle al
+//           usuario que ya puede comer a los fantasmas 
 void dibujar_fantasma(ALLEGRO_BITMAP *pm, int xf,int yf){
   if(estadoFantasma == true){
       al_draw_tinted_bitmap(pm, al_map_rgba_f(1, 0, 1, 1), xf, yf, 0);
@@ -445,45 +501,48 @@ void mover_inky(){
       I.xf=0;
 }
 
-
-
+//Función: choque_camino
+//Dominio: No recibe ningún parámetro
+//Codominio: En esta función, se verifica si el Pacman logra perseguir y comer a los fantasmas.
 void choque_camino(){
   if(CantMovimiento!=0){
-    if ((B.xf == x && B.yf == y) || (B.xf == ax && B.yf == ay)){
+    if ((B.xf == x && B.yf == y) || (B.xf == ax && B.yf == ay))
        volver_casita(B.xf,B.yf,0);
-    }
       
-    if((I.xf == x && I.yf == y) || (I.xf == ax && I.yf == ay)){
+    if((I.xf == x && I.yf == y) || (I.xf == ax && I.yf == ay))
        volver_casita(I.xf,I.yf,1);
-    }
-
-    if((P.xf == x && P.yf == y) || (P.xf == ax && P.yf == ay)){
+    
+    if((P.xf == x && P.yf == y) || (P.xf == ax && P.yf == ay))
        volver_casita(P.xf,P.yf,2);
-    }
 
-    if ((C.xf == x && C.yf == y) || (C.xf == ax && C.yf == ay)){
+    if ((C.xf == x && C.yf == y) || (C.xf == ax && C.yf == ay))
        volver_casita(C.xf,C.yf,3);
-    }
+    
   }else{
       estadoFantasma = false;
   }
 }
 
-void inteligencia_fantasma(int inicio,int destino,int fantasma){
-    int py=y;
-    int px=x;
-    encontrar_ruta_inteligencia(destino,inicio);    
-    int direccion;
-    int contador=0;
-    int inicio1,destino1;
 
+//Función: inteligencia_fantasma
+//Dominio: Recibe tres números enteros, el nodo inicio y nodo final, y el id de fantasma
+//Codominio: En esta función, predice los movimientos de Pinky, e intenta bloquear la otra salida 
+//           Primero se verifica si el pacman está en una posición verticla o horizontal, y después verifica
+//           a cuál dirección se va mover para poder sacar la posición contraria
+void inteligencia_fantasma(int inicio,int destino,int fantasma){
+    int py=y,px=x;
+    encontrar_ruta_inteligencia(destino,inicio);    
+    int direccion,inicio1,destino1,contador=0;
+
+    //Si x y y son iguales, se usará la posición anterior del Pacman para verificarlo
     if(arr_nodofw[inteligencia[0]].posy == arr_nodofw[inteligencia[1]].posy == arr_nodofw[inteligencia[1]].posx){
         destino = retornarpos((ay/30) * maxcol + (ax/30)); 
-        py=ay;
-        px=ax;
+        py=ay; px=ax;
         encontrar_ruta_inteligencia(destino,inicio);
     }
 
+    //Utilizando la ruta más corta de Pinky, y se verifica cuál sería la dirección que debe usar Blinky y Clyde para 
+    //bloquear a Pacman en la otra salida
     if(arr_nodofw[inteligencia[0]].posy == arr_nodofw[inteligencia[1]].posy){
         ((arr_nodofw[inteligencia[1]].posx - arr_nodofw[inteligencia[0]].posx) >0) ? (direccion=0) : (direccion=1);
         for(int i=1;arr_nodofw[inteligencia[0]].posy == arr_nodofw[inteligencia[i]].posy;i++) contador++;
@@ -532,6 +591,7 @@ void inteligencia_fantasma(int inicio,int destino,int fantasma){
         }
     }
 
+    //Calcular la ruta más corta para bloquear al Pacman en la otra salida
     if(fantasma==0){
         inicio1 = retornarpos((B.yf/30) * maxcol + (B.xf/30));
         destino1 = retornarpos((py/30) * maxcol + (px/30));
@@ -563,9 +623,9 @@ void inteligencia_fantasma(int inicio,int destino,int fantasma){
 
 void * mover_fantasmas(void *entrada){
      
-    int xi = ((struct info*)entrada)->xf;
-    int yj = ((struct info*)entrada)->yf;
-    int fantasma = ((struct info*)entrada)->id;
+    int xi = ((struct info_fant*)entrada)->xf;
+    int yj = ((struct info_fant*)entrada)->yf;
+    int fantasma = ((struct info_fant*)entrada)->id;
 
     int destino,inicio; 
     
@@ -583,7 +643,6 @@ void * mover_fantasmas(void *entrada){
     size_t largo = sizeof(Camino)/sizeof(Camino[0]);
    
     int ruta = Camino[1];
-
 
     if(fantasma == 3){    
          pthread_mutex_lock(&semc); 
@@ -625,17 +684,20 @@ void * mover_fantasmas(void *entrada){
     } 
 }
 
+//Función: teclas
+//Dominio: No recibe ningún parámetro
+//Codominio: En esta función,lee las teclas y el Pacman se mueve según la dirección 
 void * teclas(void * param){
     pthread_mutex_lock(&semp);  
     al_get_keyboard_state(&keyState);
     if(al_key_down(&keyState,ALLEGRO_KEY_DOWN)){
-      dir = DOWN;
+      dir = down;
     }else if(al_key_down(&keyState,ALLEGRO_KEY_UP)){
-      dir = UP;
+      dir = up;
     }else if(al_key_down(&keyState,ALLEGRO_KEY_RIGHT)){
-      dir = RIGHT;
+      dir = right;
     }else if(al_key_down(&keyState,ALLEGRO_KEY_LEFT)){
-      dir=LEFT;         
+      dir=left;         
     }
 
     if(CantMovimiento>0){
@@ -667,31 +729,30 @@ void * teclas(void * param){
     pthread_mutex_unlock(&semp);
 }
 
+//Función: perdio
+//Dominio: No recibe ningún parámetro
+//Codominio: En esta función,cada vez que el Pacman choca contra los fantasma, se devuelve a la cueva y la posición original
+//           del Pacman y se le restará una vida. Cuando ya la vida es 0, el juego termina 
 void perdio(){
   if(estadoFantasma==false){
-    if (vidas == 0){
-      done = true;
-    }  
+    if (vidas == 0) done = true;
 
     if ((B.xf == x && B.yf == y)||(I.xf == x && I.yf == y)||(P.xf == x && P.yf == y)||(C.xf == x && C.yf == y) ||
         (B.xf == ax && B.yf == ay)||(I.xf == ax && I.yf == ay)||(P.xf == ax && P.yf == ay)||(C.xf == ax && C.yf == ay)){
-         B.xf=420;
-         B.yf=180;
-         I.xf=390;
-         I.yf=270;
-         P.xf=420;
-         P.yf=270;
-         C.xf=450;
-         C.yf=270;
-         x = 420;
-         y = 510;
+         B.xf=420; B.yf=180; I.xf=390; I.yf=270;
+         P.xf=420; P.yf=270; C.xf=450; C.yf=270;
+         x = 420; y = 510;
          vidas -=1;     
-      }
+    }
   }
 }
 
+//Función: allegro_funciones
+//Dominio: No recibe ningún parámetro
+//Codominio: 
 void allegro_funciones(){
     float tiempo = 60.0;
+    //Incializar 
     al_init();
     al_install_keyboard();
     al_init_primitives_addon();
@@ -713,6 +774,7 @@ void allegro_funciones(){
     al_set_window_title(disp,"Pac-Man"); //nombre de la ventana
     al_set_new_bitmap_flags(ALLEGRO_MEMORY_BITMAP);
     
+    //Importar las imagenes
     roca = al_load_bitmap("roca.jpg");
     punto = al_load_bitmap("punto.png");
     semilla = al_load_bitmap("Semilla.png");
@@ -754,8 +816,7 @@ void allegro_funciones(){
       if(event.type == ALLEGRO_EVENT_TIMER){
         al_draw_bitmap(bmp , 0 , 0 , 0);
         dibujar_mapa(roca,punto,semilla);
-        ax = x;
-        ay = y;
+        ax = x; ay = y;
         dibujar_pacman();
         dibujar_fantasma(blinky,B.xf,B.yf);
         dibujar_fantasma(inky,I.xf,I.yf);
@@ -770,22 +831,16 @@ void allegro_funciones(){
           pthread_create(&hinky,NULL,mover_fantasmas,&I);
           pthread_create(&hpinky,NULL,mover_fantasmas,&P); 
         }
-   
+   		
+   		//Reinciar el tablero
         if(verificar_tablero()==1){
-           speedClyde=speedClyde*1.1;
-           speedFants=speedFants*1.1;  
+           speedClyde*=1.1;
+           speedFants*=1.1;  
            llenarTablero();
            colocarSemillas(CantiSemilla,TipoSemilla);
-           B.xf=420;
-           B.yf=180;
-           I.xf=390;
-           I.yf=270;
-           P.xf=420;
-           P.yf=270;
-           C.xf=450;
-           C.yf=270;
-           x = 420;
-           y = 510;
+           B.xf=420; B.yf=180; I.xf=390; I.yf=270;
+           P.xf=420; P.yf=270; C.xf=450; C.yf=270;
+           x = 420; y = 510;
            CantMovimiento=0;
         }
 
@@ -831,4 +886,3 @@ int main(){
     allegro_funciones();    
     return 0;
 }
-
