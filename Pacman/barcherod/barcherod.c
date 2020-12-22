@@ -86,7 +86,7 @@ int CantiSemilla;
 char TipoSemilla[12];
 int x=420,y=510,ax,ay;                         //Posiciones donde empieza pacman
 float speed,speedClyde,speedFants,speedPacman; //Velocidades
-int CantMovimiento=0,moveSpeed=30,vidas=5,dir = down;
+int CantMovimiento=0,moveSpeed=30,vidas=100,dir = down;
 bool done=false,escapan=false,estadoTablero=true,estadoFantasma=false;
 //Posiciones donde se van colocar las semillas
 int NumCoordenadas[32] = {1,2,17,27,10,8,4,15,6,26,13,3,17,5,1,22,13,19,3,5,6,12,9,26,15,15,17,18,8,1,18,2};
