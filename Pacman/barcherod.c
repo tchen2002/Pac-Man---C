@@ -17,6 +17,9 @@ Estudiantes: Te Chen Huang
 #include <allegro5/allegro_font.h>
 #include <allegro5/allegro_image.h>
 #include <allegro5/allegro_primitives.h>
+#include <allegro5/allegro_audio.h>
+#include <allegro5/allegro_acodec.h>
+
 
 #define maxfil 20 
 #define maxcol  29
@@ -39,6 +42,8 @@ ALLEGRO_BITMAP *inky;
 ALLEGRO_BITMAP *pinky;
 ALLEGRO_BITMAP *clyde;
 ALLEGRO_KEYBOARD_STATE keyState;
+
+
 
 pthread_mutex_t semc = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t semf = PTHREAD_MUTEX_INITIALIZER; 
@@ -780,8 +785,10 @@ void allegro_funciones(){
     //Incializar 
     al_init();
     al_install_keyboard();
+    al_install_audio();        
     al_init_primitives_addon();
     al_init_image_addon();
+    al_init_acodec_addon();
     
     pthread_mutex_init(&semc,NULL);
     pthread_mutex_init(&semf,NULL);
@@ -814,6 +821,10 @@ void allegro_funciones(){
 
     ALLEGRO_BITMAP* bmp = al_create_bitmap(880,600);
     ALLEGRO_EVENT_QUEUE* queue = al_create_event_queue();
+
+    al_reserve_samples(1);
+    ALLEGRO_SAMPLE * background = al_load_sample("background.ogg");
+    al_play_sample(background, 1.0, 0.0, 1.0, ALLEGRO_PLAYMODE_LOOP, 0);
     
     al_register_event_source(queue, al_get_keyboard_event_source());
     al_register_event_source(queue, al_get_display_event_source(disp));
@@ -874,7 +885,7 @@ void allegro_funciones(){
         
        }
     } 
-
+    al_destroy_sample(background);
     al_destroy_bitmap(roca);
     al_destroy_bitmap(pacmanArriba);
     al_destroy_bitmap(pacmanAbajo);
